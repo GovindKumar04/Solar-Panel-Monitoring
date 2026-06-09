@@ -1,4 +1,5 @@
-import { pool } from "../config/db.js";
+import dotenv from "dotenv/config";
+import pool from "../config/db.js";
 
 export const seedUserAuth = async () => {
   try {
@@ -12,11 +13,11 @@ export const seedUserAuth = async () => {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         username VARCHAR(100) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-
+        mobile_number VARCHAR(15),
+        password TEXT NOT NULL,
+        role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
         refresh_token TEXT,
-
-        role VARCHAR(20) DEFAULT 'user',
+       
         is_verified BOOLEAN DEFAULT FALSE,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -28,4 +29,4 @@ export const seedUserAuth = async () => {
   }
 };
 
-seedUserAuth()
+seedUserAuth();
