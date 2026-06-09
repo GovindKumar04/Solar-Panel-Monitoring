@@ -20,3 +20,10 @@ export const registerSchema = z.object({
     .enum(["user", "admin"])
     .default("user")
 });
+export const loginSchema = z.object({
+  email: z
+    .email("Invalid email"),
+  password_hash: z
+    .string()
+    .min(8, "Password must be at least 8 characters"),
+});

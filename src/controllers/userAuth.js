@@ -41,31 +41,54 @@ export const register = asyncHandler(async (req, res) => {
     );
 });
 
-export const login = asyncHandler(async (req,res) => {
+export const login = asyncHandler(async (req, res) => {
   const { email, password_hash } = req.body;
-  const user = await pool.query("SELECT user_id username email mobile_number password_hash role  FROM users where email=$1", [
-    email,
-  ]);
 
-  if (user.rows.length < 0)
-    throw new ApiError(401, "Ohh-ho! You are not connected with us yet");
+  const result = await pool.query(
+    `SELECT user_id, username, email,mobile_number, password_hash, role
+     FROM users
+     WHERE email = $1`,
+    [email]
+  );
 
-  if (user.password_hash != password_hash)
-    throw new ApiError(402, "Please enter correct password");
+  if (result.rows.length === 0) {
+    throw new ApiError(401, "User not found");
+  }
 
-  const accesToken = genrateAccessToken(user);
+  const user = result.rows[0];
+
+  const isPasswordCorrect = await bcrypt.compare(
+    password_hash,
+    user.password_hash
+  );
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(401, "Invalid password");
+  }
+
+  const accessToken = genrateAccessToken(user);
   const refreshToken = genrateRefreshToken(user);
 
-  user.refreshToken = refreshToken;
-
-  res
+  await pool.query(
+    `UPDATE users
+     SET refresh_token = $1
+     WHERE user_id = $2`,
+    [refreshToken, user.user_id]
+  );
+  delete user?.password_hash;
+  return res
     .status(200)
-    .cookies(accesToken)
-    .cookies(refreshToken)
+    .cookie("accessToken", accessToken, {
+      httpOnly: true,
+    })
+    .cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+    })
     .json(
-      ApiResponse(
+      new ApiResponse(
         200,
-        `Welcome to the green and clean community ${user.username}`,
-      ),
+        user,
+        `Welcome ${user.username}`
+      )
     );
 });
