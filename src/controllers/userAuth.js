@@ -5,7 +5,7 @@ import ApiResponse from "../utils/ApiResponse.js";
 import bcrypt from "bcrypt";
 
 export const register = asyncHandler(async (req, res) => {
-  const { username, email, mobile_number, password, role } = req.body;
+  const { username, email, mobile_number, password_hash, role } = req.body;
 
   const existingUser = await pool.query(
     "SELECT email FROM users WHERE email = $1",
@@ -16,11 +16,11 @@ export const register = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User already exists");
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password_hash, 10);
 
   const user = await pool.query(
     `INSERT INTO users
-    (username, email, mobile_number, password, role)
+    (username, email, mobile_number, password_hash, role)
     VALUES ($1, $2, $3, $4, $5)
     RETURNING id, username, email, mobile_number, role`,
     [username, email, mobile_number, hashedPassword, role]

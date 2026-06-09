@@ -14,7 +14,7 @@ export const seedUserAuth = async () => {
         username VARCHAR(100) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         mobile_number VARCHAR(15),
-        password TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
         role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
         refresh_token TEXT,
        
