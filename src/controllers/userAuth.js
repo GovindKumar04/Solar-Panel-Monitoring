@@ -92,3 +92,8 @@ export const login = asyncHandler(async (req, res) => {
       )
     );
 });
+
+const logOut = asyncHandler(async (req, res) => {
+  const user = req.user;
+  use.clearCookies();
+})

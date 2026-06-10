@@ -1,26 +1,63 @@
 # Solar Panel Monitoring
 
-A Node.js application for monitoring and managing solar panel systems with real-time data tracking and management.
+A Node.js + Express backend for monitoring and managing solar panel systems. The current release ships the **authentication layer** (user registration & login with JWT), built on top of PostgreSQL.
 
-## Overview
+---
 
-Solar Panel Monitoring is a backend service built with Express.js that provides API endpoints for tracking solar panel performance, energy generation, and system health. The application uses PostgreSQL for data persistence and is designed to handle large-scale monitoring operations.
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Environment Variables](#environment-variables)
+- [Running the Application](#running-the-application)
+- [Project Structure](#project-structure)
+- [API Documentation](#api-documentation)
+  - [Register](#1-register-a-user)
+  - [Login](#2-login)
+- [Response Format](#response-format)
+- [Rate Limiting](#rate-limiting)
+- [Database Schema](#database-schema)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+---
 
 ## Features
 
-- Real-time solar panel performance monitoring
-- Energy generation tracking and analytics
-- RESTful API endpoints for data management
-- PostgreSQL database integration
-- Environment-based configuration
-- Scalable architecture
+- 🔐 **User authentication** — registration & login with hashed passwords (bcrypt)
+- 🎫 **JWT tokens** — access & refresh tokens issued on login, set as `httpOnly` cookies
+- ✅ **Request validation** — schema validation with Zod on every input
+- 🚦 **Rate limiting** — protects endpoints from abuse
+- 🗄️ **PostgreSQL** — connection pooling via `pg`
+- 📦 **Consistent API responses** — unified success/error response shape
+
+---
+
+## Tech Stack
+
+| Layer            | Technology                          |
+| ---------------- | ----------------------------------- |
+| Runtime          | Node.js (ES Modules)                |
+| Framework        | Express 5                           |
+| Database         | PostgreSQL (`pg`)                   |
+| Auth             | `jsonwebtoken`, `bcrypt`            |
+| Validation       | `zod`                               |
+| Rate limiting    | `express-rate-limit`               |
+| Config           | `dotenv`                            |
+
+---
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
-- **Node.js** (v14 or higher)
-- **npm** (v6 or higher)
-- **PostgreSQL** (v12 or higher)
+Make sure the following are installed:
+
+- **Node.js** v18 or higher (the `--watch` dev script requires v18+)
+- **npm** v9 or higher
+- **PostgreSQL** v12 or higher
+
+---
 
 ## Installation
 
@@ -35,121 +72,319 @@ Before you begin, ensure you have the following installed:
    npm install
    ```
 
-3. **Setup environment variables:**
-   Create a `.env` file in the root directory and configure the following variables:
-   ```env
-   PORT=4000
-   DATABASE_URL=postgresql://username:password@localhost:5432/solar_panel_db
-   ```
+3. **Create your `.env` file** (see [Environment Variables](#environment-variables) below).
 
-4. **Setup the database:**
-   Run the database migrations to create necessary tables:
+4. **Run the database migration** to create the `users` table:
    ```bash
    npm run migrate
    ```
+
+---
+
+## Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+# Server
+PORT=4000
+
+# PostgreSQL
+DATABASE_URL=postgresql://username:password@localhost:5432/solar_panel_db
+
+# JWT — access token
+ACCESS_TOKEN_SECRET=your_access_token_secret
+ACCESS_TOKEN_EXPIRES_IN=15m
+
+# JWT — refresh token
+REFRESH_TOKEN_SECRET=your_refresh_token_secret
+REFRESH_TOKEN_EXPIRES_IN=7d
+```
+
+| Variable                  | Description                                          | Example         |
+| ------------------------- | ---------------------------------------------------- | --------------- |
+| `PORT`                    | Port the server listens on (defaults to `4000`)      | `4000`          |
+| `DATABASE_URL`            | PostgreSQL connection string                         | `postgresql://...` |
+| `ACCESS_TOKEN_SECRET`     | Secret used to sign access tokens                    | random string   |
+| `ACCESS_TOKEN_EXPIRES_IN` | Access token lifetime                                | `15m`           |
+| `REFRESH_TOKEN_SECRET`    | Secret used to sign refresh tokens                   | random string   |
+| `REFRESH_TOKEN_EXPIRES_IN`| Refresh token lifetime                               | `7d`            |
+
+> ⚠️ Never commit your `.env` file. Use long, random values for the token secrets.
+
+---
+
+## Running the Application
+
+| Command            | What it does                                            |
+| ------------------ | ------------------------------------------------------- |
+| `npm start`        | Starts the server (`node server.js`)                    |
+| `npm run dev`      | Starts the server with auto-reload on file changes      |
+| `npm run migrate`  | Creates the `users` table in the database               |
+
+```bash
+npm start
+```
+
+On startup the server:
+1. Loads environment variables from `.env`
+2. Initializes the Express app
+3. Connects to PostgreSQL and runs a test query
+4. Listens on `PORT`
+
+You should see `connected` in the console once the database is reachable.
+
+The API base URL is:
+
+```
+http://localhost:<PORT>/api
+```
+
+---
 
 ## Project Structure
 
 ```
 Solar-Panel-Monitoring/
 ├── src/
-│   ├── config/          # Configuration files (database connection, etc.)
-│   └── migrations/      # Database migration scripts
-├── app.js               # Express application setup
-├── server.js            # Server entry point
-├── package.json         # Project dependencies and scripts
-└── README.md            # This file
+│   ├── config/
+│   │   └── db.js                       # PostgreSQL connection pool
+│   ├── controllers/
+│   │   └── userAuth.js                 # register & login request handlers
+│   ├── middlewares/
+│   │   ├── auth.middlewares.js         # (reserved) auth middleware
+│   │   ├── requestLimiter.middleware.js# global rate limiter
+│   │   ├── validate.middleware.js      # Zod schema validation
+│   │   └── verifyJWT.js                # (reserved) JWT verification
+│   ├── migrations/
+│   │   └── user.js                     # creates the users table
+│   ├── routes/
+│   │   └── auth.routes.js              # /api/register, /api/login routes
+│   ├── utils/
+│   │   ├── ApiError.js                 # standardized error class
+│   │   ├── ApiResponse.js              # standardized success response class
+│   │   ├── asyncHandler.js             # async error-handling wrapper
+│   │   └── genrateTokens.js            # access & refresh token generators
+│   └── validations/
+│       └── auth.validation.js          # Zod schemas for register & login
+├── app.js                              # Express app setup & middleware wiring
+├── server.js                           # Entry point — starts the server
+├── package.json
+└── README.MD
 ```
 
-## Configuration
+---
 
-### Database Configuration
-The application connects to PostgreSQL via the connection pool defined in `src/config/db.js`. Update your `.env` file with the correct database credentials.
+## API Documentation
 
-### Port Configuration
-By default, the server runs on port 4000. You can change this by setting the `PORT` environment variable.
+**Base URL:** `http://localhost:<PORT>/api`
 
-## Running the Application
+All request and response bodies are JSON. Send `Content-Type: application/json`.
 
-Start the server:
-```bash
-npm start
+> **Note on `password_hash`:** the request field is named `password_hash`, but you should send the **plain-text password** — the server hashes it before storing.
+
+---
+
+### 1. Register a User
+
+Creates a new user account.
+
+```
+POST /api/register
 ```
 
-Or use Node directly:
-```bash
-node server.js
+**Request body:**
+
+| Field           | Type   | Required | Rules                                      |
+| --------------- | ------ | -------- | ------------------------------------------ |
+| `username`      | string | ✅       | Minimum 3 characters                       |
+| `email`         | string | ✅       | Valid email address (must be unique)       |
+| `mobile_number` | string | ✅       | Exactly 10 digits                          |
+| `password_hash` | string | ✅       | Minimum 8 characters (sent as plain text)  |
+| `role`          | string | ❌       | `"user"` or `"admin"` (defaults to `user`) |
+
+**Example request:**
+
+```json
+{
+  "username": "govind",
+  "email": "govind@example.com",
+  "mobile_number": "9876543210",
+  "password_hash": "SuperSecret123",
+  "role": "user"
+}
 ```
 
-The server will:
-1. Load environment variables from `.env`
-2. Initialize the Express application
-3. Connect to the PostgreSQL database
-4. Start listening on the specified PORT
+**Success — `201 Created`:**
 
-You should see `connected` in the console when the database connection is successful.
-
-## API Endpoints
-
-The application provides RESTful API endpoints for solar panel monitoring. Detailed endpoint documentation will be available as the project develops.
-
-## Development
-
-### Running Tests
-```bash
-npm test
+```json
+{
+  "statusCode": 201,
+  "data": {
+    "user_id": "a1b2c3d4-...",
+    "username": "govind",
+    "email": "govind@example.com",
+    "mobile_number": "9876543210",
+    "role": "user"
+  },
+  "message": "Welcome to clean and green community",
+  "success": true
+}
 ```
 
-### Adding Dependencies
-To add new dependencies:
-```bash
-npm install <package-name>
+**Error responses:**
+
+| Status | Reason                          |
+| ------ | ------------------------------- |
+| `400`  | Validation failed (see body)    |
+| `409`  | A user with that email exists   |
+
+---
+
+### 2. Login
+
+Authenticates a user and issues JWT tokens.
+
+```
+POST /api/login
 ```
 
-## Dependencies
+**Request body:**
 
-- **express** (^5.2.1) - Web framework for building REST APIs
-- **pg** (^8.21.0) - PostgreSQL client for Node.js
-- **dotenv** (^17.4.2) - Environment variable management
+| Field           | Type   | Required | Rules                                     |
+| --------------- | ------ | -------- | ----------------------------------------- |
+| `email`         | string | ✅       | Valid email address                       |
+| `password_hash` | string | ✅       | Minimum 8 characters (sent as plain text) |
 
-## Database Migrations
+**Example request:**
 
-Migration scripts are located in `src/migrations/`. To run migrations:
-```bash
-npm run migrate
+```json
+{
+  "email": "govind@example.com",
+  "password_hash": "SuperSecret123"
+}
 ```
 
-## Error Handling
+**Success — `200 OK`:**
 
-The application includes proper error handling for database connections and API requests. Check the console output for error messages if the server fails to start or connect to the database.
+On success the server sets two `httpOnly` cookies — `accessToken` and `refreshToken` — and returns the user:
 
-## Contributing
+```json
+{
+  "statusCode": 200,
+  "data": {
+    "user_id": "a1b2c3d4-...",
+    "username": "govind",
+    "email": "govind@example.com",
+    "mobile_number": "9876543210",
+    "role": "user"
+  },
+  "message": "Welcome govind",
+  "success": true
+}
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request to the repository.
+**Error responses:**
 
-## License
+| Status | Reason                                |
+| ------ | ------------------------------------- |
+| `400`  | Validation failed (see body)          |
+| `401`  | User not found / invalid password     |
 
-This project is licensed under the ISC License - see the `package.json` file for details.
+---
 
-## Repository
+## Response Format
 
-For more information and to report issues, visit the [GitHub repository](https://github.com/GovindKumar04/Solar-Panel-Monitoring-).
+**Successful** responses follow a consistent shape:
+
+```json
+{
+  "statusCode": 200,
+  "data": { },
+  "message": "Success",
+  "success": true
+}
+```
+
+**Validation errors** (`400`) return the Zod issues array:
+
+```json
+{
+  "success": false,
+  "errors": [
+    {
+      "code": "too_small",
+      "minimum": 3,
+      "path": ["username"],
+      "message": "Username must be at least 3 characters"
+    }
+  ]
+}
+```
+
+---
+
+## Rate Limiting
+
+A global rate limiter is applied to all routes:
+
+- **Window:** 30 seconds
+- **Limit:** 5 requests per window per IP
+
+Exceeding the limit returns:
+
+```json
+{
+  "success": false,
+  "message": "Too many requests. Take a breath and try again."
+}
+```
+
+---
+
+## Database Schema
+
+The `users` table (created by `npm run migrate`):
+
+| Column          | Type           | Notes                                          |
+| --------------- | -------------- | ---------------------------------------------- |
+| `user_id`       | UUID           | Primary key, auto-generated                    |
+| `username`      | VARCHAR(100)   | Required                                       |
+| `email`         | VARCHAR(255)   | Required, unique                               |
+| `mobile_number` | VARCHAR(12)    |                                                |
+| `password_hash` | TEXT           | bcrypt hash                                    |
+| `role`          | VARCHAR(20)    | `user` or `admin`, defaults to `user`          |
+| `refresh_token` | TEXT           | Latest refresh token                           |
+| `is_verified`   | BOOLEAN        | Defaults to `false`                            |
+| `created_at`    | TIMESTAMP      | Defaults to current time                       |
+| `updated_at`    | TIMESTAMP      | Defaults to current time                       |
+
+---
 
 ## Troubleshooting
 
-### Database Connection Issues
-- Ensure PostgreSQL is running and accessible
-- Verify the `DATABASE_URL` in your `.env` file
-- Check that the database user has proper permissions
+**Database connection issues**
+- Ensure PostgreSQL is running and reachable.
+- Verify `DATABASE_URL` in your `.env`.
+- Confirm the database user has the right permissions.
 
-### Port Already in Use
-- Change the `PORT` environment variable to an available port
-- Or kill the process using the current port
+**`relation "users" does not exist`**
+- Run the migration: `npm run migrate`.
 
-### Module Not Found Errors
-- Run `npm install` to ensure all dependencies are installed
-- Clear the `node_modules` folder and reinstall if issues persist: `rm -rf node_modules && npm install`
+**Port already in use**
+- Change `PORT` in `.env`, or stop the process using that port.
 
-## Contact
+**Module not found errors**
+- Run `npm install`. If it persists, delete `node_modules` and reinstall.
 
-For questions or support, please open an issue on the [GitHub repository](https://github.com/GovindKumar04/Solar-Panel-Monitoring-/issues).
+---
+
+## License
+
+This project is licensed under the **ISC License** — see [`package.json`](./package.json) for details.
+
+## Repository
+
+[GitHub repository](https://github.com/GovindKumar04/Solar-Panel-Monitoring-) · [Report an issue](https://github.com/GovindKumar04/Solar-Panel-Monitoring-/issues)
+</content>
+</invoke>

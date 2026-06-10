@@ -1,4 +1,3 @@
-import dotenv from "dotenv/config";
 import pool from "../config/db.js";
 
 export const seedUserAuth = async () => {
@@ -26,7 +25,6 @@ export const seedUserAuth = async () => {
     console.log("Users table created successfully");
   } catch (error) {
     console.error("Error creating users table:", error);
+    throw error;
   }
 };
-
-seedUserAuth();
